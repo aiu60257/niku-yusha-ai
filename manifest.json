@@ -1,0 +1,8 @@
+{
+  "name": "肉勇者AI",
+  "short_name": "肉勇者",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000",
+  "theme_color": "#000"
+}
