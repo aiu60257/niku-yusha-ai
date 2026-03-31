@@ -1,22 +1,43 @@
 const API_URL = "https://niku-yusha-ai-git-main-aiu602572-2922s-projects.vercel.app/api/generate";
 
 // ===== モード =====
-// true：テスト（履歴保存しない）
-// false：本番（履歴保存する）
+// true：テスト（保存しない）
+// false：本番（保存する）
 const TEST_MODE = true;
 
+
+// ===== トレンド取得（簡易）=====
+async function getTrends(){
+  return ["AI","物価高","SNS炎上","仕事"];
+}
+
+
+// ===== バズ判定 =====
+function isGoodTweet(text){
+
+  if(!text) return false;
+
+  // 禁止ワード（名前ブレ対策）
+  if(text.includes("友達") || text.includes("彼")) return false;
+
+  let score = 0;
+
+  if(text.includes("私")) score += 1;
+  if(text.includes("\n")) score += 1;
+  if(text.length >= 40 && text.length <= 120) score += 2;
+
+  return score >= 3;
+}
+
+
+// ===== メイン =====
 async function generateTweet(){
 
   const mode = document.getElementById("mode").value;
 
-  // ===== データ読み込み =====
-  const world = await fetch("data/world.json").then(r=>r.json());
-  const characters = await fetch("data/characters.json").then(r=>r.json());
-  const story = await fetch("data/story.json").then(r=>r.json());
-
+  // データ読み込み
   let state = await fetch("data/state.json").then(r=>r.json());
 
-  // 履歴を分離
   let history;
   if(mode === "story"){
     history = await fetch("data/history_story.json").then(r=>r.json());
@@ -24,13 +45,12 @@ async function generateTweet(){
     history = await fetch("data/history_daily.json").then(r=>r.json());
   }
 
-  // ===== トレンド（仮：後で自動取得に差し替え）=====
-  const trends = ["AI","物価高","SNS炎上","仕事"];
+  const trends = await getTrends();
 
-  // ===== 直近履歴 =====
   const recent = history.posts.slice(-5).map(p=>p.text).join("\n");
 
-  // ===== プロンプト分岐 =====
+  const storyNumber = state.story_number || 1;
+
   let prompt = "";
 
   // ===== ストーリー =====
@@ -43,18 +63,24 @@ async function generateTweet(){
 
 ▼ルール
 ・100文字前後
-・物語が進む内容
-・ややシリアス
-・最後に引きを入れる
-・【第一話】などタイトルOK
-・一人称「私」
-・矛盾禁止
+・物語が進む
+・最後に引き
+・【第${storyNumber}話】を必ず付ける
+
+▼名前ルール（厳守）
+・ゆうは必ず「ゆう」
+・他の呼び方禁止（友、友達、彼は禁止）
+・魔王は「トレンドン」または「トレンドン会長」
+・違反したらERRORと出力
 
 ▼状態
 ${JSON.stringify(state)}
 
-▼過去の流れ
+▼過去
 ${recent}
+
+▼トレンド
+${trends.join(",")}
 `;
   }
 
@@ -69,52 +95,59 @@ ${recent}
 ▼ルール
 ・40〜80文字
 ・会話形式OK
-・ボケ7：シリアス3
-・オチを入れる
-・テンポ重視
-・一人称「私」
+・オチ必須
+
+▼名前ルール（厳守）
+・ゆうは必ず「ゆう」
+・他の呼び方禁止（友、友達、彼は禁止）
 
 ▼トレンド
 ${trends.join(",")}
 `;
   }
 
-  // ===== API呼び出し =====
-  const res = await fetch(API_URL,{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({prompt})
-  });
+  // ===== AI生成（最大5回リトライ）=====
+  let data;
+  let attempts = 0;
 
-  const data = await res.json();
+  do{
+    const res = await fetch(API_URL,{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({prompt})
+    });
 
-  // ===== 表示 =====
+    data = await res.json();
+    attempts++;
+
+  }while(!isGoodTweet(data.text) && attempts < 5);
+
   document.getElementById("result").innerText = data.text;
+
 
   // ===== テストモードなら保存しない =====
   if(TEST_MODE) return;
 
-  // ===== 保存処理 =====
+
+  // ===== 保存 =====
   history.posts.push({
     text: data.text,
-    timestamp: new Date().toISOString(),
-    type: mode
+    timestamp: new Date().toISOString()
   });
 
-  // ===== 状態更新（ストーリー時のみ）=====
+  // ===== 状態更新 =====
   if(mode === "story"){
+    state.story_number += 1;
     state.tension += 2;
     state.yu_growth += 1;
     state.last_event = data.text;
   }
 
-  console.log("保存（仮）", history, state);
+  console.log("保存データ", history, state);
 }
 
 
-// ===== 再生成（履歴に影響なし）=====
+// ===== 再生成 =====
 async function regenerate(){
   await generateTweet();
 }
