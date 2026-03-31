@@ -1,25 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>肉勇者AI</title>
-
-<link rel="manifest" href="manifest.json">
-
+  <meta charset="UTF-8">
+  <title>肉勇者AI</title>
 </head>
-
 <body>
 
-<h2>肉勇者ツイート生成</h2>
-<select id="mode">
-  <option value="story">ストーリー</option>
-  <option value="daily">日常</option>
-</select>
+<h2>第1話生成</h2>
 
-<button onclick="generateStory5()">5話生成</button>
-<button onclick="generateDaily()">日常バズ生成</button>
+<button onclick="generateStory()">生成</button>
+<button onclick="regenerate()">再生成</button>
 
-<div id="result"></div>
+<pre id="result"></pre>
 
 <script src="app.js"></script>
 
