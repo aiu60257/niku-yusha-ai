@@ -1,155 +1,99 @@
 const API_URL = "https://niku-yusha-ai-git-main-aiu602572-2922s-projects.vercel.app/api/generate";
 
-// ===== モード =====
-// true：テスト（保存しない）
-// false：本番（保存する）
 const TEST_MODE = true;
 
 
-// ===== トレンド取得（簡易）=====
-async function getTrends(){
-  return ["AI","物価高","SNS炎上","仕事"];
+// ===== キャラ定義 =====
+function getCharacterDefinition(){
+return `
+あなたは肉勇者。
+
+・一人称「私」
+・ゆうは必ず「ゆう」
+・別名禁止
+・魔王はトレンドン
+
+違反したらERROR出力
+`;
 }
 
 
-// ===== バズ判定 =====
-function isGoodTweet(text){
+// ===== 5話まとめて生成 =====
+async function generateBatchStories(){
 
-  if(!text) return false;
-
-  // 禁止ワード（名前ブレ対策）
-  if(text.includes("友達") || text.includes("彼")) return false;
-
-  let score = 0;
-
-  if(text.includes("私")) score += 1;
-  if(text.includes("\n")) score += 1;
-  if(text.length >= 40 && text.length <= 120) score += 2;
-
-  return score >= 3;
-}
-
-
-// ===== メイン =====
-async function generateTweet(){
-
-  const mode = document.getElementById("mode").value;
-
-  // データ読み込み
   let state = await fetch("data/state.json").then(r=>r.json());
+  let history = await fetch("data/history_story.json").then(r=>r.json());
+  let seed = await fetch("data/story_seed.json").then(r=>r.json());
 
-  let history;
-  if(mode === "story"){
-    history = await fetch("data/history_story.json").then(r=>r.json());
-  }else{
-    history = await fetch("data/history_daily.json").then(r=>r.json());
-  }
+  const characterDef = getCharacterDefinition();
 
-  const trends = await getTrends();
+  let tempStories = [];
 
-  const recent = history.posts.slice(-5).map(p=>p.text).join("\n");
+  for(let i=0;i<5;i++){
 
-  const storyNumber = state.story_number || 1;
+    const storyNumber = state.story_number + i;
 
-  let prompt = "";
+    const recent = [
+      ...seed.episodes,
+      ...history.posts.slice(-5).map(p=>p.text),
+      ...tempStories
+    ].join("\n");
 
-  // ===== ストーリー =====
-  if(mode === "story"){
-    prompt = `
-あなたは肉勇者です。
+    const prompt = `
+${characterDef}
 
-▼投稿タイプ
-ストーリー
+【第${storyNumber}話】
 
-▼ルール
 ・100文字前後
-・物語が進む
-・最後に引き
-・【第${storyNumber}話】を必ず付ける
+・ストーリーを進める
+・ゆうを必ず出す
+・過去と矛盾しない
 
-▼名前ルール（厳守）
-・ゆうは必ず「ゆう」
-・他の呼び方禁止（友、友達、彼は禁止）
-・魔王は「トレンドン」または「トレンドン会長」
-・違反したらERRORと出力
-
-▼状態
-${JSON.stringify(state)}
-
-▼過去
+【過去ストーリー】
 ${recent}
-
-▼トレンド
-${trends.join(",")}
 `;
-  }
 
-  // ===== 日常 =====
-  else{
-    prompt = `
-あなたは肉勇者です。
-
-▼投稿タイプ
-日常
-
-▼ルール
-・40〜80文字
-・会話形式OK
-・オチ必須
-
-▼名前ルール（厳守）
-・ゆうは必ず「ゆう」
-・他の呼び方禁止（友、友達、彼は禁止）
-
-▼トレンド
-${trends.join(",")}
-`;
-  }
-
-  // ===== AI生成（最大5回リトライ）=====
-  let data;
-  let attempts = 0;
-
-  do{
     const res = await fetch(API_URL,{
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body:JSON.stringify({prompt})
     });
 
-    data = await res.json();
-    attempts++;
+    const data = await res.json();
 
-  }while(!isGoodTweet(data.text) && attempts < 5);
+    tempStories.push(data.text);
+  }
 
-  document.getElementById("result").innerText = data.text;
-
+  // ===== 表示 =====
+  document.getElementById("result").innerText =
+    tempStories.join("\n\n----------------\n\n");
 
   // ===== テストモードなら保存しない =====
   if(TEST_MODE) return;
 
-
   // ===== 保存 =====
-  history.posts.push({
-    text: data.text,
-    timestamp: new Date().toISOString()
+  tempStories.forEach(text=>{
+    history.posts.push({
+      text,
+      timestamp: new Date().toISOString()
+    });
   });
 
-  // ===== 状態更新 =====
-  if(mode === "story"){
-    state.story_number += 1;
-    state.tension += 2;
-    state.yu_growth += 1;
-    state.last_event = data.text;
-  }
+  state.story_number += 5;
 
-  console.log("保存データ", history, state);
+  console.log("保存", history, state);
+}
+
+
+// ===== 単発 =====
+async function generateTweet(){
+  await generateBatchStories();
 }
 
 
 // ===== 再生成 =====
 async function regenerate(){
-  await generateTweet();
+  await generateBatchStories();
 }
 
 
