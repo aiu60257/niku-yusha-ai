@@ -10,47 +10,56 @@ return `
 
 ・一人称「私」
 ・ゆうは必ず「ゆう」
-・別名禁止
-・魔王はトレンドン
+・ボケ役：肉勇者
+・ツッコミ：ゆう
 
-違反したらERROR出力
+禁止：
+・友達、友人、彼などの呼び方
+・名前ブレ
+
+違反時はERROR出力
 `;
 }
 
 
-// ===== 5話まとめて生成 =====
-async function generateBatchStories(){
+// ===== ストーリー5話生成 =====
+async function generateStory5(){
 
-  let state = await fetch("data/state.json").then(r=>r.json());
-  let history = await fetch("data/history_story.json").then(r=>r.json());
-  let seed = await fetch("data/story_seed.json").then(r=>r.json());
+  const seed = await fetch("data/story_seed.json").then(r=>r.json());
+  const character = getCharacterDefinition();
 
-  const characterDef = getCharacterDefinition();
+  let results = [];
 
-  let tempStories = [];
+  for(let i=0;i<seed.episodes.length;i++){
 
-  for(let i=0;i<5;i++){
-
-    const storyNumber = state.story_number + i;
-
-    const recent = [
-      ...seed.episodes,
-      ...history.posts.slice(-5).map(p=>p.text),
-      ...tempStories
-    ].join("\n");
+    const ep = seed.episodes[i];
 
     const prompt = `
-${characterDef}
+${character}
 
-【第${storyNumber}話】
+【タイトル】
+${ep.title}
 
+【目的】
+${ep.goal}
+
+【感情】
+${ep.emotion}
+
+【フック】
+${ep.hook}
+
+【トーン】
+${ep.tone}
+
+【ルール】
 ・100文字前後
-・ストーリーを進める
-・ゆうを必ず出す
-・過去と矛盾しない
+・会話 or 地の文あり
+・ゆう必ず登場
+・少し笑える
+・最後に軽い引き
 
-【過去ストーリー】
-${recent}
+出力のみ
 `;
 
     const res = await fetch(API_URL,{
@@ -61,39 +70,70 @@ ${recent}
 
     const data = await res.json();
 
-    tempStories.push(data.text);
+    results.push(data.text);
   }
 
-  // ===== 表示 =====
   document.getElementById("result").innerText =
-    tempStories.join("\n\n----------------\n\n");
+    results.join("\n\n----------------\n\n");
+}
 
-  // ===== テストモードなら保存しない =====
-  if(TEST_MODE) return;
 
-  // ===== 保存 =====
-  tempStories.forEach(text=>{
-    history.posts.push({
-      text,
-      timestamp: new Date().toISOString()
-    });
+// ===== 日常バズ投稿 =====
+async function generateDaily(){
+
+  const character = getCharacterDefinition();
+
+  const templates = [
+    "勘違い系",
+    "現代ネタ",
+    "哲学ボケ",
+    "ゆうツッコミ強め",
+    "SNSネタ"
+  ];
+
+  const type = templates[Math.floor(Math.random()*templates.length)];
+
+  const prompt = `
+${character}
+
+【投稿タイプ】
+日常バズ投稿
+
+【テーマ】
+${type}
+
+【ルール】
+・40〜80文字
+・会話形式
+・オチ必須
+・テンポ重視
+
+【バズ条件】
+・共感 or クスっと笑い
+・最後に落とす
+
+出力のみ
+`;
+
+  const res = await fetch(API_URL,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({prompt})
   });
 
-  state.story_number += 5;
+  const data = await res.json();
 
-  console.log("保存", history, state);
+  document.getElementById("result").innerText = data.text;
 }
 
 
-// ===== 単発 =====
+// ===== ボタン用 =====
 async function generateTweet(){
-  await generateBatchStories();
+  await generateStory5();
 }
 
-
-// ===== 再生成 =====
 async function regenerate(){
-  await generateBatchStories();
+  await generateStory5();
 }
 
 
