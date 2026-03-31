@@ -1,127 +1,47 @@
 const API_URL = "https://niku-yusha-ai-git-main-aiu602572-2922s-projects.vercel.app/api/generate";
 
-const TEST_MODE = true;
 
+// ===== メイン =====
+async function generateStory(){
 
-// ===== キャラ定義 =====
-const prompt = `
+  const seed = await fetch("data/story_seed.json").then(r=>r.json());
+
+  const ep = seed.episodes[0]; // 今回は第1話固定
+
+  const prompt = `
 あなたはプロの小説家です。
 以下のJSON設定を100%厳守して文章を生成してください。
 
-【重要】
-・フォーマットを崩すな
-・セリフ構造を守れ
-・改行を再現しろ
-・テンポを再現しろ
-・sample_outputを参考にしつつ“同じ構造で別表現”にする
+【最重要ルール】
+・構造を絶対に守る
+・改行の位置を再現する
+・テンポを再現する
+・セリフ形式を守る（名前：「セリフ」）
+・説明口調は禁止
+・必ず自然な会話にする
 
-【設定】
+【キャラルール】
+・肉勇者 → 短く喋る（命令形）
+・ゆう → 驚き・ツッコミ
+・「友達」「友人」「彼」禁止
+
+【やること】
+sample_outputの“構造・テンポ・流れ”をコピーし、
+文章は完全に別表現で生成する
+
+【JSON設定】
 ${JSON.stringify(ep)}
 
 【出力条件】
 ・文章のみ出力
 ・解説禁止
-・構造を完全再現
-
-`;
-
-
-// ===== ストーリー5話生成 =====
-async function generateStory5(){
-
-  const seed = await fetch("data/story_seed.json").then(r=>r.json());
-  const character = getCharacterDefinition();
-
-  let results = [];
-
-  for(let i=0;i<seed.episodes.length;i++){
-
-    const ep = seed.episodes[i];
-
-    const prompt = `
-${character}
-
-【タイトル】
-${ep.title}
-
-【目的】
-${ep.goal}
-
-【感情】
-${ep.emotion}
-
-【フック】
-${ep.hook}
-
-【トーン】
-${ep.tone}
-
-【ルール】
-・100文字前後
-・会話 or 地の文あり
-・ゆう必ず登場
-・少し笑える
-・最後に軽い引き
-
-出力のみ
-`;
-
-    const res = await fetch(API_URL,{
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({prompt})
-    });
-
-    const data = await res.json();
-
-    results.push(data.text);
-  }
-
-  document.getElementById("result").innerText =
-    results.join("\n\n----------------\n\n");
-}
-
-
-// ===== 日常バズ投稿 =====
-async function generateDaily(){
-
-  const character = getCharacterDefinition();
-
-  const templates = [
-    "勘違い系",
-    "現代ネタ",
-    "哲学ボケ",
-    "ゆうツッコミ強め",
-    "SNSネタ"
-  ];
-
-  const type = templates[Math.floor(Math.random()*templates.length)];
-
-  const prompt = `
-${character}
-
-【投稿タイプ】
-日常バズ投稿
-
-【テーマ】
-${type}
-
-【ルール】
-・40〜80文字
-・会話形式
-・オチ必須
-・テンポ重視
-
-【バズ条件】
-・共感 or クスっと笑い
-・最後に落とす
-
-出力のみ
 `;
 
   const res = await fetch(API_URL,{
     method:"POST",
-    headers:{ "Content-Type":"application/json" },
+    headers:{
+      "Content-Type":"application/json"
+    },
     body:JSON.stringify({prompt})
   });
 
@@ -131,13 +51,9 @@ ${type}
 }
 
 
-// ===== ボタン用 =====
-async function generateTweet(){
-  await generateStory5();
-}
-
+// ===== 再生成 =====
 async function regenerate(){
-  await generateStory5();
+  await generateStory();
 }
 
 
